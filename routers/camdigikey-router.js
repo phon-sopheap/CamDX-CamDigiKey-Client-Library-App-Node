@@ -29,9 +29,38 @@ router.post('/user-face', async (req, res) => {
   }
 })
 
-router.get('/login-token', async (req, res) => {
+function cleanQueryValue(value) {
+  const raw = Array.isArray(value) ? value[value.length - 1] : value;
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
   try {
-    return res.status(200).json(await CamDigiKeyClient.default.getLoginToken())
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+router.get('/login-token', async (req, res) => {
+  const { successReturnUrl, errorReturnUrl, ...rest } = req.query;
+
+  const callbackVars = {};
+  for (const [key, value] of Object.entries(rest)) {
+    const cleaned = cleanQueryValue(value);
+    if (cleaned !== undefined) {
+      callbackVars[key] = cleaned;
+    }
+  }
+
+  const cleanSuccessReturnUrl = cleanQueryValue(successReturnUrl);
+  const cleanErrorReturnUrl = cleanQueryValue(errorReturnUrl);
+
+  try {
+    return res.status(200).json(await CamDigiKeyClient.default.getLoginToken({
+      ...(cleanSuccessReturnUrl && { successReturnUrl: cleanSuccessReturnUrl }),
+      ...(cleanErrorReturnUrl && { errorReturnUrl: cleanErrorReturnUrl }),
+      callbackVars
+    }))
   } catch (err) {
     return res.status(500).json({ error: err.message })
   }
